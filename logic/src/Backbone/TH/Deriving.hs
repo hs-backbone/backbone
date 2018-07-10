@@ -22,6 +22,7 @@ module Backbone.TH.Deriving
     , BasicType
     , helper_liftM
     , helper_id
+    , mkName
 
     -- ** misc
     , substituteNewtype
@@ -121,7 +122,7 @@ deriveHierarchy :: Name -> [Name] -> Q [Dec]
 deriveHierarchy typename classnameL =
     deriveHierarchyFiltered typename classnameL []
 
--- | Like "deriveHierarchy" except classes in the second list will not be derived.
+-- | Like "deriveHierarchy" except classes & type families in the second list will not be derived.
 deriveHierarchyFiltered :: Name -> [Name] -> [Name] -> Q [Dec]
 deriveHierarchyFiltered typename classnameL filterL = do
     classL <-
@@ -150,11 +151,12 @@ deriveSingleInstance typename classname =
                     error $ "\nderiveSingleInstance; typeinfo=" ++ show typeinfo
 
             typefamilies <- deriveTypefamilies
-                [ mkName "Scalar"
-                , mkName "Elem"
+                [
+        --        [ mkName "Scalar" FIXME: make this way more modular!
+                   mkName "Elem"
         --         , mkName "Index"
                 , mkName "Logic"
-                , mkName "Actor"
+        --        , mkName "Actor"
                 ]
                 typename
 

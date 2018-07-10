@@ -35,7 +35,7 @@ module Backbone.Algebra.Logic.Logic
     , Container (..)
     , law_Container_preservation
 --  , ifThenElse
-    , IfThenElse(..)
+    , Decide(..)
     , Eq (..)
     , law_Eq_reflexive
     , law_Eq_symmetric
@@ -101,20 +101,24 @@ module Backbone.Algebra.Logic.Logic
     , otherwise
     ) where
 
-import qualified Prelude as P
-import Prelude (($), (++))
+import qualified Prelude                       as P
+import           Prelude                        ( ($)
+                                                , (++)
+                                                )
 
-import Data.Ratio
-import Test.QuickCheck (frequency, Arbitrary(..))
+import           Data.Ratio
+import           Test.QuickCheck                ( frequency
+                                                , Arbitrary(..)
+                                                )
 
-import GHC.Types hiding (Module, type (*), True, False)
+import          GHC.Types hiding (Module, type (*), True, False)
 
-import NumHask.Algebra.Abstract.Group
-import NumHask.Algebra.Abstract.Field
-import NumHask.Algebra.Abstract.Additive
-import NumHask.Algebra.Abstract.Multiplicative
-import NumHask.Algebra.Natural
-import Backbone.Data.Backend
+import           NumHask.Algebra.Abstract.Group
+import           NumHask.Algebra.Abstract.Field
+import           NumHask.Algebra.Abstract.Additive
+import           NumHask.Algebra.Abstract.Multiplicative
+import           NumHask.Algebra.Natural
+import           Backbone.Data.Backend
 
 -- the next step after NumHask. Also added some missing instances
 type Natural' a = (Natural a, ClassicalLogic (Logic a), Lattice a, POrd a, Invertible (Sum a), Unital (Product a))
@@ -136,7 +140,8 @@ class Eq a => Container a where
     notElem = not elem
 
 law_Container_preservation :: Container s => s -> s -> Elem s -> Logic s
-law_Container_preservation a1 a2 e = (a1==a2) ==> ((e `elem` a1) ==> (e `elem` a2))
+law_Container_preservation a1 a2 e =
+    (a1 == a2) ==> ((e `elem` a1) ==> (e `elem` a2))
 
 type instance Elem Bool = ()
 instance Container Bool where
@@ -160,25 +165,27 @@ instance Eq a => Container [a] where
 --------------------
 
 class
-    ( Monoid (Elem a)
-    , Container a
-    , IfThenElse (Logic a)
-    ) => IfThenElse a
+    -- ( Monoid (Elem a)
+    -- , Container a
+    -- , IfThenElse (Logic a)
+    -- ) => 
+    -- | non-recursive to make GHC more predictable. Makes some things more tedious, but I think buyes us usability.
+    Decide a
         where
     ifThenElse :: a -> b -> b -> b
-    ifThenElse a = ifThenElse (unit `elem` a)
-instance {-# OVERLAPPABLE #-} 
-    ( Monoid (Elem a)
-    , Container a
-    , IfThenElse (Logic a)
-    ) => IfThenElse a
+
+-- instance {-# OVERLAPPABLE #-} 
+--     ( Monoid (Elem a)
+--     , Container a
+--     , IfThenElse (Logic a)
+--     ) => Decide a
 
 instance Magma Bool where
     {-# INLINE magma #-}
     magma = (||)
 instance Semigroup Bool
 instance Unital Bool where unit = P.False
-instance IfThenElse Bool where
+instance Decide Bool where
     ifThenElse P.True  b _ = b
     ifThenElse P.False _ b = b
 instance Magma () where
@@ -186,7 +193,7 @@ instance Magma () where
     magma () () = ()
 instance Unital () where unit = ()
 instance Semigroup ()
-instance IfThenElse () where
+instance Decide () where
     ifThenElse () b _ = b
 
 ----------------------------------------
@@ -205,7 +212,8 @@ type IdempLogic a = Logic (Logic (Logic a))~Logic (Logic a)
 
 type Classical (alg :: Type -> Constraint) (a :: Type) = (ClassicalLogic a, alg a)
 
-class (Boolean a, IfThenElse a, Bounded a)
+class (Boolean a, Decide a)
+     -- Bounded a)
      => ClassicalLogic a where
     fromBool :: Bool -> a
     toBool :: P.Monad (BMonad a) => a -> (BMonad a) Bool
@@ -238,16 +246,16 @@ class (IdempLogic a, Container (Logic a), Boolean (Logic a)) => Eq a where
     (/=) = not (==)
 
 law_Eq_reflexive :: Eq a => a -> Logic a
-law_Eq_reflexive a = a==a
+law_Eq_reflexive a = a == a
 
 law_Eq_symmetric :: Eq a => a -> a -> Logic (Logic a)
-law_Eq_symmetric a1 a2 = (a1==a2)==(a2==a1)
+law_Eq_symmetric a1 a2 = (a1 == a2) == (a2 == a1)
 
 law_Eq_transitive :: Eq a => a -> a -> a -> Logic a
-law_Eq_transitive a1 a2 a3 = (a1==a2&&a2==a3) ==> (a1==a3)
+law_Eq_transitive a1 a2 a3 = (a1 == a2 && a2 == a3) ==> (a1 == a3)
 
 defn_Eq_noteq :: (IdempLogic a, Eq a) => a -> a -> Logic (Logic a)
-defn_Eq_noteq a1 a2 = (a1/=a2) == (not $ a1==a2)
+defn_Eq_noteq a1 a2 = (a1 /= a2) == (not $ a1 == a2)
 
 #define mkEq(x) \
 type instance Logic x = Bool; \
@@ -489,28 +497,25 @@ law_Lattice_supabsorption :: Lattice b => b -> b -> Logic b
 law_Lattice_supabsorption b1 b2 = sup b1 (inf b1 b2) == b1
 
 law_Lattice_reflexivity :: Lattice a => a -> Logic a
-law_Lattice_reflexivity a = a<=a
+law_Lattice_reflexivity a = a <= a
 
 law_Lattice_antisymmetry :: (ClassicalLogic a, Lattice a, Logic a ~ Bool) => a -> a -> Logic a
-law_Lattice_antisymmetry a1 a2
-    | a1 <= a2 && a2 <= a1 = a1 == a2
-    | otherwise = true
+law_Lattice_antisymmetry a1 a2 | a1 <= a2 && a2 <= a1 = a1 == a2
+                               | otherwise            = true
 
 law_Lattice_transitivity :: (ClassicalLogic a, Lattice a, Logic a ~ Bool) => a -> a -> a -> Logic a
-law_Lattice_transitivity  a1 a2 a3
-    | a1 <= a2 && a2 <= a3 = a1 <= a3
-    | a1 <= a3 && a3 <= a2 = a1 <= a2
-    | a2 <= a1 && a1 <= a3 = a2 <= a3
-    | a2 <= a3 && a3 <= a1 = a2 <= a1
-    | a3 <= a2 && a2 <= a1 = a3 <= a1
-    | a3 <= a1 && a1 <= a2 = a3 <= a2
-    | otherwise = true
+law_Lattice_transitivity a1 a2 a3 | a1 <= a2 && a2 <= a3 = a1 <= a3
+                                  | a1 <= a3 && a3 <= a2 = a1 <= a2
+                                  | a2 <= a1 && a1 <= a3 = a2 <= a3
+                                  | a2 <= a3 && a3 <= a1 = a2 <= a1
+                                  | a3 <= a2 && a2 <= a1 = a3 <= a1
+                                  | a3 <= a1 && a1 <= a2 = a3 <= a2
+                                  | otherwise            = true
 
 defn_Lattice_greaterthan :: (ClassicalLogic a, Lattice a, Logic a ~ Bool) => a -> a -> Logic a
-defn_Lattice_greaterthan a1 a2
-    | a1 < a2 = a2 >= a1
-    | a1 > a2 = a2 <= a1
-    | otherwise = true
+defn_Lattice_greaterthan a1 a2 | a1 < a2   = a2 >= a1
+                               | a1 > a2   = a2 <= a1
+                               | otherwise = true
 
 #define mkLattice(x)\
 instance Lattice x where \
@@ -585,31 +590,36 @@ class Lattice b => Graded b where
     -- | Repeatedly apply the "pred" function
     predN :: (Natural' (BInt b), P.Show (BInt b))  => (BInt b) -> b -> b
     predN i b =
-        if i  < zero 
+        if i  < zero
             then P.error $ "predN called on negative number " ++ (P.show i)
             else if i == zero
                 then b
                 else predN (i-one) $ pred b
 
-law_Graded_fromEnum :: (Lattice b, Graded b, Natural' (BInt b), ClassicalLogic (Logic b)) => b -> b -> Logic (BInt b)
-law_Graded_fromEnum b1 b2 = 
-    if (b1 <  b2)
-        then (fromEnum b1 <  fromEnum b2)
-        else if (b1 >  b2)
-            then (fromEnum b1 >  fromEnum b2)
-            else if (b1 == b2)
-                then (fromEnum b1 == fromEnum b2)
-                else True
+law_Graded_fromEnum
+    :: (Lattice b, Graded b, Natural' (BInt b), ClassicalLogic (Logic b))
+    => b
+    -> b
+    -> Logic (BInt b)
+law_Graded_fromEnum b1 b2 = if (b1 < b2)
+    then (fromEnum b1 < fromEnum b2)
+    else if (b1 > b2)
+        then (fromEnum b1 > fromEnum b2)
+        else if (b1 == b2) then (fromEnum b1 == fromEnum b2) else True
 
 law_Graded_pred :: (Graded b, Natural' (BInt b)) => b -> b -> Logic (BInt b)
-law_Graded_pred b1 _ = fromEnum (pred b1) == fromEnum b1-one
-                     || fromEnum (pred b1) == fromEnum b1
+law_Graded_pred b1 _ =
+    fromEnum (pred b1) == fromEnum b1 - one || fromEnum (pred b1) == fromEnum b1
 
-defn_Graded_predN :: (Graded b, Natural' (BInt b), P.Show (BInt b)) => (BInt b) -> b -> Logic b
+defn_Graded_predN
+    :: (Graded b, Natural' (BInt b), P.Show (BInt b))
+    => (BInt b)
+    -> b
+    -> Logic b
 defn_Graded_predN i b = ifThenElse (i < zero) true (go i b == predN i b)
-    where
-        go :: (Graded b, Natural' (BInt b)) => (BInt b) -> b -> b
-        go i' b' = ifThenElse (i' == zero) b' (go (i'-one) $ pred b')
+  where
+    go :: (Graded b, Natural' (BInt b)) => (BInt b) -> b -> b
+    go i' b' = ifThenElse (i' == zero) b' (go (i' - one) $ pred b')
 
 {-# INLINE (<.) #-}
 (<.) :: Graded b => b -> b -> Logic b
@@ -634,9 +644,12 @@ class (Graded b, Ord b) => Enum b where
 law_Enum_toEnum :: (Enum b, Natural (BInt b)) => b -> Logic b
 law_Enum_toEnum b = toEnum (fromEnum b) == b
 
-law_Enum_succ :: (Enum b, Logic (BInt b) ~ Logic b, Natural (BInt b), Eq (BInt b)) => b -> Logic b
-law_Enum_succ b1 = fromEnum (succ b1) == fromEnum b1+one
-                || fromEnum (succ b1) == fromEnum b1
+law_Enum_succ
+    :: (Enum b, Logic (BInt b) ~ Logic b, Natural (BInt b), Eq (BInt b))
+    => b
+    -> Logic b
+law_Enum_succ b1 =
+    fromEnum (succ b1) == fromEnum b1 + one || fromEnum (succ b1) == fromEnum b1
 
 defn_Enum_succN :: (Enum b, Natural (BInt b)) => (BInt b) -> b -> Logic b
 defn_Enum_succN i b = succN i b == toEnum (fromEnum b + i)
@@ -665,12 +678,10 @@ law_Ord_totality :: Ord a => a -> a -> Logic a
 law_Ord_totality a1 a2 = a1 <= a2 || a2 <= a1
 
 law_Ord_min :: Ord a => a -> a -> Logic a
-law_Ord_min a1 a2 = min a1 a2 == a1
-                 || min a1 a2 == a2
+law_Ord_min a1 a2 = min a1 a2 == a1 || min a1 a2 == a2
 
 law_Ord_max :: Ord a => a -> a -> Logic a
-law_Ord_max a1 a2 = max a1 a2 == a1
-                 || max a1 a2 == a2
+law_Ord_max a1 a2 = max a1 a2 == a1 || max a1 a2 == a2
 
 {-# INLINE min #-}
 min :: Ord a => a -> a -> a
@@ -724,8 +735,8 @@ class Bounded b => Complemented b where
     not :: b -> b
 
 law_Complemented_not :: Complemented b => b -> Logic b
-law_Complemented_not b = not (true  `P.asTypeOf` b) == false
-                      && not (false `P.asTypeOf` b) == true
+law_Complemented_not b =
+    not (true `P.asTypeOf` b) == false && not (false `P.asTypeOf` b) == true
 
 instance Complemented ()   where
     {-# INLINE not #-}
@@ -769,7 +780,8 @@ law_Heyting_infright :: Heyting b => b -> b -> Logic b
 law_Heyting_infright b1 b2 = (b2 && (b1 ==> b2)) == b2
 
 law_Heyting_distributive :: Heyting b => b -> b -> b -> Logic b
-law_Heyting_distributive b1 b2 b3 = (b1 ==> (b2 && b3)) == ((b1 ==> b2) && (b1 ==> b3))
+law_Heyting_distributive b1 b2 b3 =
+    (b1 ==> (b2 && b3)) == ((b1 ==> b2) && (b1 ==> b3))
 
 -- | FIXME: add the axioms for intuitionist logic, which are theorems based on these laws
 --
@@ -805,10 +817,12 @@ law_Boolean_supcomplement :: Boolean b => b -> Logic b
 law_Boolean_supcomplement b = (b && not b) == false
 
 law_Boolean_infdistributivity :: Boolean b => b -> b -> b -> Logic b
-law_Boolean_infdistributivity b1 b2 b3 = (b1 || (b2 && b3)) == ((b1 || b2) && (b1 || b3))
+law_Boolean_infdistributivity b1 b2 b3 =
+    (b1 || (b2 && b3)) == ((b1 || b2) && (b1 || b3))
 
 law_Boolean_supdistributivity :: Boolean b => b -> b -> b -> Logic b
-law_Boolean_supdistributivity b1 b2 b3 = (b1 && (b2 || b3)) == ((b1 && b2) || (b1 && b3))
+law_Boolean_supdistributivity b1 b2 b3 =
+    (b1 && (b2 || b3)) == ((b1 && b2) || (b1 && b3))
 
 instance Boolean ()
 instance Boolean Bool

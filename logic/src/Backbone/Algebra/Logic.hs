@@ -3,6 +3,12 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RebindableSyntax #-}
 -- |
 --
 -- See "Plausibility Measures: A User's Guide" from UAI 1995
@@ -17,16 +23,21 @@ import           Backbone.Algebra.Logic.Logic
 import           NumHask.Algebra.Abstract.Group
 import           NumHask.Algebra.Abstract.Ring
 import           NumHask.Algebra.Abstract.Module
+import           NumHask.Algebra.Abstract.Additive
+import           NumHask.Algebra.Abstract.Multiplicative
 import           NumHask.Data.Rational
 import           Test.QuickCheck                ( frequency
                                                 , Arbitrary(..)
                                                 )
 import           Control.DeepSeq
--- import           SubHask.Algebra
--- import           SubHask.Category
--- import           SubHask.Internal.Prelude
 import           Backbone.TH.Deriving
-import           Prelude (Read(..), Show(..), Bool)
+import           Prelude                        ( Read(..)
+                                                , Show(..)
+                                                , Bool(..)
+                                                , ($)
+                                                )
+import qualified Prelude                       as P
+import           Data.Coerce
 
 class (Ord r, Ring r) => OrdRing_ r
 instance (Ord r, Ring r) => OrdRing_ r
@@ -41,10 +52,10 @@ type Goedel = Goedel_ Rational
 
 newtype Goedel_ r = Goedel_ r
 
-deriveHierarchyFiltered ''Goedel_ [ ''Eq ] [ ''Arbitrary ]
+deriveHierarchyFiltered ''Goedel_ [ ''Eq ] [ ''Arbitrary,(mkName "Scalar"),(mkName "Actor")]
 
-instance (OrdRing_ r, ClassicalLogic r, Arbitrary r) => Arbitrary (Goedel_ r) where
-    arbitrary = fmap Goedel_ $ arbitrary `suchThat` ((>=0) && (<=1))
+instance (OrdRing_ r, Arbitrary r, Logic r ~ Bool) => Arbitrary (Goedel_ r) where
+    arbitrary = fmap Goedel_ $ arbitrary `suchThat` ((>=zero) && (<=one))
 
 instance OrdRing_ r => POrd (Goedel_ r) where
     inf (Goedel_ r1) (Goedel_ r2) = Goedel_ $ min r1 r2
@@ -52,17 +63,17 @@ instance OrdRing_ r => POrd (Goedel_ r) where
 instance OrdRing_ r => Lattice (Goedel_ r) where
     sup (Goedel_ r1) (Goedel_ r2) = Goedel_ $ max r1 r2
 
-instance OrdRing_ r => Ord (Goedel_ r)
+deriving instance (OrdRing_ r) => Ord (Goedel_ r)
 
 instance OrdRing_ r => MinBound  (Goedel_ r) where
-    minBound = Goedel_ 0
+    minBound = Goedel_ zero
 
 instance OrdRing_ r => Bounded  (Goedel_ r) where
-    maxBound = Goedel_ 1
+    maxBound = Goedel_ one
 
-instance (OrdRing_ r, ClassicalLogic r) => Heyting (Goedel_ r) where
+instance (OrdRing_ r, Decide (Logic r)) => Heyting (Goedel_ r) where
 --     (Goedel_ r1)==>(Goedel_ r2) = if r1 <= r2 then Goedel_ 1 else Goedel_ (1 - r1 + r2)
-    (Goedel_ r1)==>(Goedel_ r2) = if r1 <= r2 then Goedel_ 1 else Goedel_ r2
+  (Goedel_ r1)==>(Goedel_ r2) = if r1 <= r2 then Goedel_ one else Goedel_ r2
 
 ---------------------------------------
 
@@ -83,7 +94,7 @@ instance NFData H3 where
     rnf HUnknown = ()
 
 instance Arbitrary H3 where
-    arbitrary = oneof $ map return [HTrue, HFalse, HUnknown]
+    arbitrary = oneof $ P.map return [HTrue, HFalse, HUnknown]
 
 type instance Logic H3 = Bool
 
@@ -144,7 +155,7 @@ instance NFData K3 where
     rnf KUnknown = ()
 
 instance Arbitrary K3 where
-    arbitrary = oneof $ map return [KTrue, KFalse, KUnknown]
+    arbitrary = oneof $ P.map return [KTrue, KFalse, KUnknown]
 
 type instance Logic K3 = Bool
 
@@ -185,24 +196,34 @@ newtype Boolean2Ring b = Boolean2Ring b
 
 deriveHierarchy ''Boolean2Ring [ ''Boolean ]
 
-instance (IsMutable b, Boolean b, Eq b) => Semigroup (Boolean2Ring b) where
-    (Boolean2Ring b1)+(Boolean2Ring b2) = Boolean2Ring $ (b1 || b2) && not (b1 && b2)
+instance (Boolean b, Eq b) => Magma (Sum (Boolean2Ring b)) where
+    (Sum (Boolean2Ring b1)) `magma`(Sum (Boolean2Ring b2)) = Sum $ Boolean2Ring $ (b1 || b2) && not (b1 && b2)
 
-instance (IsMutable b, Boolean b, Eq b) => Abelian (Boolean2Ring b)
+instance (Boolean b, Eq b) => Semigroup (Sum (Boolean2Ring b))
 
-instance (IsMutable b, Boolean b, Eq b) => Monoid (Boolean2Ring b) where
-    zero = Boolean2Ring $ false
+instance (Boolean b, Eq b) => Commutative (Sum (Boolean2Ring b))
 
-instance (IsMutable b, Boolean b, Eq b) => Cancellative (Boolean2Ring b) where
-    (-)=(+)
+instance (Boolean b, Eq b) => Unital (Sum (Boolean2Ring b)) where
+    unit = Sum $ Boolean2Ring false
 
-instance (IsMutable b, Boolean b, Eq b) => Group (Boolean2Ring b) where
-    negate = id
+instance (Boolean b, Eq b) => Invertible (Sum (Boolean2Ring b)) where
+    inv = P.id
 
-instance (IsMutable b, Boolean b, Eq b) => Rg (Boolean2Ring b) where
-    (Boolean2Ring b1)*(Boolean2Ring b2) = Boolean2Ring $ b1 && b2
+-- instance (Boolean b, Eq b) => Group (Boolean2Ring b) where
+--     negate = id
+instance (Boolean b, Eq b) => Magma (Product (Boolean2Ring b)) where
+    (Product (Boolean2Ring b1)) `magma`(Product (Boolean2Ring b2)) = Product $ Boolean2Ring $ b1 && b2
 
-instance (IsMutable b, Boolean b, Eq b) => Rig (Boolean2Ring b) where
-    one = Boolean2Ring $ true
+instance (Boolean b, Eq b) => Commutative (Product (Boolean2Ring b))
 
-instance (IsMutable b, Boolean b, Eq b) => Ring (Boolean2Ring b)
+instance (Boolean b, Eq b) => Unital (Product (Boolean2Ring b)) where
+    unit = Product $ Boolean2Ring true
+
+instance (Boolean b, Eq b) => Absorbing (Product (Boolean2Ring b)) where
+    absorb = Product $ Boolean2Ring false
+
+instance (Boolean b, Eq b) => (Semigroup (Product (Boolean2Ring b)))
+
+instance (Boolean b, Eq b) => Distributive (Boolean2Ring b)
+
+instance (Boolean b, Eq b) => Ring (Boolean2Ring b)
