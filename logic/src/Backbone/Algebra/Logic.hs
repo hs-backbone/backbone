@@ -1,3 +1,8 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 -- |
 --
 -- See "Plausibility Measures: A User's Guide" from UAI 1995
@@ -9,10 +14,19 @@ import           Test.QuickCheck.Gen            ( suchThat
                                                 )
 
 import           Backbone.Algebra.Logic.Logic
+import           NumHask.Algebra.Abstract.Group
+import           NumHask.Algebra.Abstract.Ring
+import           NumHask.Algebra.Abstract.Module
+import           NumHask.Data.Rational
+import           Test.QuickCheck                ( frequency
+                                                , Arbitrary(..)
+                                                )
+import           Control.DeepSeq
 -- import           SubHask.Algebra
 -- import           SubHask.Category
 -- import           SubHask.Internal.Prelude
--- import           SubHask.TemplateHaskell.Deriving
+import           Backbone.TH.Deriving
+import           Prelude (Read(..), Show(..), Bool)
 
 class (Ord r, Ring r) => OrdRing_ r
 instance (Ord r, Ring r) => OrdRing_ r

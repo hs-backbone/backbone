@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Backbone.TH.TH
   ( group
   , ring
