@@ -13,6 +13,7 @@ module Backbone.TH.Deriving
     , deriveHierarchyFiltered
     , deriveSingleInstance
     , deriveTypefamilies
+    , doDeriveSingleInstance
     , listSuperClasses
 
     -- ** compatibility functions
@@ -47,8 +48,8 @@ ifThenElse a b c = case a of
     True  -> b
     False -> c
 
--- | This class provides an artificial hierarchy that defines all the classes that a "well behaved" data type should implement.
--- All newtypes will derive them automatically.
+-- | This class provides an artificial hierarchy that defines all the classes that a "well behaved" 
+-- data type should implement. All newtypes will derive them automatically.
 type BasicType t = (Show t, Read t, Arbitrary t, NFData t)
 
 -- | We need to export this function for deriving of Monadic functions to work
@@ -135,99 +136,100 @@ deriveHierarchyFiltered typename classnameL filterL = do
 
 -- | Given a single newtype and single class, constructs newtype instances
 deriveSingleInstance :: Name -> Name -> Q [Dec]
-deriveSingleInstance typename classname =
-    if show classname == "SubHask.Mutable.IsMutable"
-        then return [] -- this special case is handled by mkMutableNewtype
-        else do
-            typeinfo                     <- reify typename
-            (conname, typekind, typeapp) <- case typeinfo of
-                TyConI (NewtypeD [] _ typekind _ (NormalC conname [(_, typeapp)]) _)
-                    -> return (conname, typekind, typeapp)
+deriveSingleInstance typename classname = deriveSingleInstance typename classname [
+    --        [ mkName "Scalar" FIXME: make this way more modular!
+                mkName "Elem"
+    --         , mkName "Index"
+            , mkName "Logic"
+    --        , mkName "Actor"
+            ]
 
-                TyConI (NewtypeD [] _ typekind _ (RecC conname [(_, _, typeapp)]) _)
-                    -> return (conname, typekind, typeapp)
+-- | Given a single newtype and single class, constructs newtype instances
+doDeriveSingleInstance :: Name -> Name -> [String] -> Q [Dec]
+doDeriveSingleInstance typename classname typeFamilies =
+    typeinfo                     <- reify typename
+    (conname, typekind, typeapp) <- case typeinfo of
+        TyConI (NewtypeD [] _ typekind _ (NormalC conname [(_, typeapp)]) _)
+            -> return (conname, typekind, typeapp)
 
-                _ ->
-                    error $ "\nderiveSingleInstance; typeinfo=" ++ show typeinfo
+        TyConI (NewtypeD [] _ typekind _ (RecC conname [(_, _, typeapp)]) _)
+            -> return (conname, typekind, typeapp)
 
-            typefamilies <- deriveTypefamilies
-                [
-        --        [ mkName "Scalar" FIXME: make this way more modular!
-                   mkName "Elem"
-        --         , mkName "Index"
-                , mkName "Logic"
-        --        , mkName "Actor"
-                ]
-                typename
+        _ ->
+            error $ "\nderiveSingleInstance; typeinfo=" ++ show typeinfo
 
-            classinfo <- reify classname
-            liftM (typefamilies ++) $ case classinfo of
+    typefamiliesD <- deriveTypefamilies
+        typeFamilies
+        typename
 
-                -- if the class has exactly one instance that applies to everything,
-                -- then don't create an overlapping instance
-                -- These classes only exist because TH has problems with type families
-                -- FIXME: this is probably not a robust solution
-                ClassI (ClassD _ _ _ _ _) [InstanceD _ _ (VarT _) _] ->
-                    return []
-                ClassI (ClassD _ _ _ _ _) [InstanceD _ _ (AppT (ConT _) (VarT _)) _]
-                    -> return []
+    classinfo <- reify classname
+    liftM (typefamiliesD ++) $ case classinfo of
 
-                -- otherwise, create the instance
-                ClassI (ClassD ctx _ [bndr] [] decs) _ -> do
-                    let varname = case bndr of
-                            PlainTV v        -> v
-                            KindedTV v StarT -> v
+        -- if the class has exactly one instance that applies to everything,
+        -- then don't create an overlapping instance
+        -- These classes only exist because TH has problems with type families
+        -- FIXME: this is probably not a robust solution
+        ClassI (ClassD _ _ _ _ _) [InstanceD _ _ (VarT _) _] ->
+            return []
+        ClassI (ClassD _ _ _ _ _) [InstanceD _ _ (AppT (ConT _) (VarT _)) _]
+            -> return []
 
-                    alreadyInstance <- isNewtypeInstance typename classname
-                    if alreadyInstance
-                        then return []
-                        else do
-                            let notDefaultSigD (DefaultSigD _ _) = False
-                                notDefaultSigD _                 = True
+        -- otherwise, create the instance
+        ClassI (ClassD ctx _ [bndr] [] decs) _ -> do
+            let varname = case bndr of
+                    PlainTV v        -> v
+                    KindedTV v StarT -> v
 
-                            funcL <-
-                                forM (filter notDefaultSigD decs) $ \dec -> do
-                                    let (f, sigtype) = case dec of
-                                            SigD f_ sigtype_ -> (f_, sigtype_)
-                                            DefaultSigD f_ sigtype_ ->
-                                                (f_, sigtype_)
-                                    body <- returnType2newtypeApplicator
-                                        conname
-                                        varname
-                                        (last (arrow2list sigtype))
-                                        ( list2exp
-                                        $ (VarE f)
-                                        : (typeL2expL $ init $ arrow2list
-                                              sigtype
-                                          )
-                                        )
+            alreadyInstance <- isNewtypeInstance typename classname
+            if alreadyInstance
+                then return []
+                else do
+                    let notDefaultSigD (DefaultSigD _ _) = False
+                        notDefaultSigD _                 = True
 
-                                    return
-                                        [ FunD f
-                                            $ [ Clause
-                                                    ( typeL2patL conname varname
-                                                    $ init
-                                                    $ arrow2list sigtype
-                                                    )
-                                                    (NormalB body)
-                                                    []
-                                              ]
-                                        , PragmaD
-                                            $ InlineP f Inline FunLike AllPhases
-                                        ]
+                    funcL <-
+                        forM (filter notDefaultSigD decs) $ \dec -> do
+                            let (f, sigtype) = case dec of
+                                    SigD f_ sigtype_ -> (f_, sigtype_)
+                                    DefaultSigD f_ sigtype_ ->
+                                        (f_, sigtype_)
+                            body <- returnType2newtypeApplicator
+                                conname
+                                varname
+                                (last (arrow2list sigtype))
+                                ( list2exp
+                                $ (VarE f)
+                                : (typeL2expL $ init $ arrow2list
+                                        sigtype
+                                    )
+                                )
 
                             return
-                                [ InstanceD
-                                      Nothing
-                                      ( AppT (ConT classname) typeapp
-                                      : map (subVarT varname typeapp) ctx
-                                      )
-                                      (AppT (ConT classname) $ apply2varlist
-                                          (ConT typename)
-                                          typekind
-                                      )
-                                      (concat funcL)
+                                [ FunD f
+                                    $ [ Clause
+                                            ( typeL2patL conname varname
+                                            $ init
+                                            $ arrow2list sigtype
+                                            )
+                                            (NormalB body)
+                                            []
+                                        ]
+                                , PragmaD
+                                    $ InlineP f Inline FunLike AllPhases
                                 ]
+
+                    return
+                        [ InstanceD
+                                Nothing
+                                ( AppT (ConT classname) typeapp
+                                : map (subVarT varname typeapp) ctx
+                                )
+                                (AppT (ConT classname) $ apply2varlist
+                                    (ConT typename)
+                                    typekind
+                                )
+                                (concat funcL)
+                        ]
 
 expandTySyn :: Type -> Q Type
 expandTySyn (AppT (ConT tysyn) vartype) = do
@@ -323,9 +325,7 @@ typeL2patL conname varname xs = map go
     go :: (Name, Type) -> Pat
     go (newvar, VarT v) =
         if v == varname then ConP conname [VarP newvar] else VarP newvar
-    go (newvar, AppT (AppT (ConT c) _) _) = if nameBase c == "Mutable"
-        then ConP (mkName $ "Mutable_" ++ nameBase conname) [VarP newvar]
-        else VarP newvar
+    go (newvar, AppT (AppT (ConT c) _) _) = VarP newvar
     go (newvar, AppT (ConT _) (VarT _)) = VarP newvar
     go (newvar, AppT ListT (VarT _)   ) = VarP newvar
     go (newvar, AppT ListT (AppT (ConT _) (VarT _))) = VarP newvar
