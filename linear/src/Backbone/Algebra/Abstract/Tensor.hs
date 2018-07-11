@@ -71,6 +71,7 @@ type family CDot (m :: [d]) (m' :: [d]) :: [d] where
 --     CDotInjectiveLeft r '[] = r
 --     CDotInjectiveLeft (l : rest') (l : ls) = CDotInjectiveRight rest' ls
 
+-- FIXME: Ugly, is there a better way?
 class (TensorAlgebra (f (Rep cont m)) (f' (Rep cont m')),
         ((f (Rep cont m)) >< (f' (Rep cont m'))) ~ f (Rep cont (CDot m m')))
         => ContravatiantTensor f cont m f' m'
