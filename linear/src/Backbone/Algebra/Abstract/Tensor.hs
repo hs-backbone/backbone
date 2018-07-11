@@ -34,6 +34,7 @@ import           Prelude                 hiding ( recip
                                                 )
 import           GHC.Types               hiding ( Module(..) )
 import           Data.Coerce
+import           Data.Singletons.Prelude
 ---------------------------------------
 
 -- | Tensor algebras generalize the outer product of vectors to construct a matrix.
@@ -82,6 +83,15 @@ instance (TensorAlgebra (f (Rep cont m)) (f' (Rep cont m'))
 dot :: forall f f' cont m m'. (ContravatiantTensor f cont m f' m')
     => f (Rep cont m) -> f' (Rep cont m') -> f (Rep cont (CDot m m'))
 dot = (><) @(f (Rep cont m)) @(f' (Rep cont m'))
+
+-- | transposes a tensor (https://en.wikipedia.org/wiki/Transpose)
+class (Field (Scalar (f (Rep cont m))), VectorSpace (f (Rep cont m))) => Transpose f cont (m :: [d]) where
+    transpose :: f (Rep cont m) -> f (Rep cont (Reverse m))
+
+-- | the hyperdeterminant (https://en.wikipedia.org/wiki/Hyperdeterminant)
+-- is a generalization of the determinant
+class (Field (Scalar t), VectorSpace t) => Derterminant t where
+    det :: t -> Scalar t
 ---------------------------------------
 
 {-

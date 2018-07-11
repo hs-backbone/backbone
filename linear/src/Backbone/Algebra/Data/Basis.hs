@@ -34,7 +34,7 @@ module Backbone.Algebra.Data.Basis
 where
 
 import           Backbone.Algebra.Linear.Basis
-import           Backbone.Algebra.Linear.Matrix
+-- import           Backbone.Algebra.Linear.Matrix
 import           GHC.Types               hiding ( Module(..))--, type (*))
 import           Data.Singletons.TH
 import           NumHask.Algebra.Integral
