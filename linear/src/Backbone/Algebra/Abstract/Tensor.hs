@@ -9,6 +9,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+--{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
 module Backbone.Algebra.Abstract.Tensor
     ( TensorAlgebra(..)
     )
@@ -38,24 +42,42 @@ import           Data.Coerce
 --
 -- FIXME:
 -- This needs to be replaced by the Tensor product in the Monoidal category Vect
-class
-    ( cont ~ (ElCont rep a)
-    , VectorSpace (f (Rep cont m))
-    , VectorSpace (f' (Rep cont m'))
-    , Scalar (f (Rep cont m)) ~ Scalar (f' (Rep cont m'))
-    , VectorSpace ((f (Rep cont m))><(f' (Rep cont m')))
-    , Scalar ((f rep)><(f' rep')) ~ Scalar (f (Rep cont m))
-    , Field ((f rep)><(f' rep')) -- FIXME: should not be needed!
-    ) => TensorAlgebra rep a
+-- class (Field (Scalar f), VectorSpace f, VectorSpace f', Scalar f ~ Scalar f'
+--         , Scalar f ~ Scalar (f >< f'), VectorSpace (f >< f')) 
+class (Field (Scalar f)) => TensorAlgebra f f'
         where
-
     -- | Take the tensor product of two vectors
-    (><) :: f (Rep cont m) -> f' (Rep cont m') -> ((f rep)><(f' rep'))
+    (><) :: f -> f' -> (f >< f')
 
--- instance TensorAlgebra Float    where  (><) = (*); vXm = (*);  mXv = (*)
--- instance TensorAlgebra Double   where  (><) = (*); vXm = (*);  mXv = (*)
--- instance TensorAlgebra Rational where  (><) = (*); vXm = (*);  mXv = (*)
+-- instance TensorAlgebra Float    where  (><) = (*); 
+-- instance TensorAlgebra Double   where  (><) = (*);
+-- instance TensorAlgebra Rational where  (><) = (*);
 
+type family CDot (m :: [d]) (m' :: [d]) :: [d] where
+    CDot a '[] = a
+    CDot '[] a = '[]
+    CDot (a : as) (a : as') = CDot as as'
+    CDot (a : as) (a': as') = a : CDot as (a' : as')
+
+--FIXME: Does this even work?
+-- type family CDotInjectiveLeft (res :: [d]) (r :: [d]) :: [d] where
+--     CDotInjectiveLeft r r = '[]
+--     CDotInjectiveLeft (l : rest') r = l : CDotInjectiveLeft rest' r
+
+-- type family CDotInjectiveRight (res :: [d]) (l :: [d]) :: [d] where
+--     CDotInjectiveLeft r '[] = r
+--     CDotInjectiveLeft (l : rest') (l : ls) = CDotInjectiveRight rest' ls
+
+class (TensorAlgebra (f (Rep cont m)) (f' (Rep cont m')),
+        ((f (Rep cont m)) >< (f' (Rep cont m'))) ~ f (Rep cont (CDot m m')))
+        => ContravatiantTensor f cont m f' m'
+instance (TensorAlgebra (f (Rep cont m)) (f' (Rep cont m'))
+        , ((f (Rep cont m)) >< (f' (Rep cont m'))) ~ f (Rep cont (CDot m m'))) 
+        => ContravatiantTensor f cont m f' m'
+
+dot :: forall f f' cont m m'. (ContravatiantTensor f cont m f' m')
+    => f (Rep cont m) -> f' (Rep cont m') -> f (Rep cont (CDot m m'))
+dot = (><) @(f (Rep cont m)) @(f' (Rep cont m'))
 ---------------------------------------
 
 {-

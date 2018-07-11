@@ -48,13 +48,13 @@ import           GHC.Types               hiding ( Module(..) )
 
 --TODO also provide more general repeated (arbirary rep kind)
 --TODO also need container for instances! TODO: kind [Nat] in times?
-newtype Repeated (times :: Nat) (meta :: m) (z :: RepShape k) =
+newtype Repeated (times :: Nat) (meta :: m) (z :: RepShape k d) =
     Repeated {unwrapRepeated' :: Default meta (Append times z)}
 
 deriving instance Show (Default meta (Rep z (t ': shape))) => Show (Repeated t meta (Rep z shape))
 deriving instance Eq (Default meta (Rep z (t ': shape))) => Eq (Repeated t meta (Rep z shape))
 
-type family Append (t :: Nat) (z :: RepShape k) = (r :: RepShape k) | r -> t z where
+type family Append (t :: Nat) (z :: RepShape k d) = (r :: RepShape k d) | r -> t z where
     Append t (Rep z shape) = (Rep z (t ': shape))
 
 $(runQ [t|forall t m z. Default m (Append t z) |] >>= (genNum' ''Repeated ["t", "m"] []))

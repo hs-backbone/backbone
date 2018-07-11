@@ -35,7 +35,7 @@ where
 
 import           Backbone.Algebra.Linear.Basis
 import           Backbone.Algebra.Linear.Matrix
-import           GHC.Types               hiding ( Module(..), type (*))
+import           GHC.Types               hiding ( Module(..))--, type (*))
 import           Data.Singletons.TH
 import           NumHask.Algebra.Integral
 import qualified Numeric.Natural               as Na

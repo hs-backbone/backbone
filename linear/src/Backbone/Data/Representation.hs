@@ -45,7 +45,7 @@ import           Data.Coerce
 --- the physical representation
 
 -- all the info needed to derive the physical representation
-data RepShape k = Rep {rep :: k, shape :: [Nat]}
+data RepShape k d = Rep {rep :: k, shape :: [d]}
 data RepInf k =  RepInf {repInf :: k}
 
 -- the usual split into Element and Container-types 
