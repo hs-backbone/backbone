@@ -46,6 +46,11 @@ class (VectorSpace a, Norm (GetNorm a) a (Scalar a)) => Banach a where
     normalize :: a -> a
     normalize v = v ./ (norm @(GetNorm a) v)
 
+infix 8 <.>
+-- | the norm of a Banach space
+(<.>) :: forall v. Banach v => v -> v -> Scalar v
+(<.>) = metric @(GetNorm v)
+
 ---------------------------------------
 
 -- | Hilbert spaces are a natural generalization of Euclidean space that allows for infinite dimension.
@@ -57,10 +62,9 @@ class (VectorSpace a, Norm (GetNorm a) a (Scalar a)) => Banach a where
 -- This is true even when the Hilbert space is over a non-ordered field like the complex numbers.
 -- But the "OrdField" constraint currently prevents us from doing scalar multiplication on Complex Hilbert spaces.
 -- See <http://math.stackexchange.com/questions/49348/inner-product-spaces-over-finite-fields> and <http://math.stackexchange.com/questions/47916/banach-spaces-over-fields-other-than-mathbbc> for some technical details.
-class ( Banach v , TensorAlgebra v , Real (Scalar v) --,OrdField (Scalar v) ) 
-                                                        ) => Hilbert v where
-    infix 8 <.>
-    (<.>) :: v -> v -> Scalar v
+-- FIXME: only inner products allowed?
+class ( Banach v , Real (Scalar v) --TensorAlgebra v, ,OrdField (Scalar v) ) 
+                                                        ) => Hilbert v
 
 -- instance Hilbert Float    where (<>) = (*)
 -- instance Hilbert Double   where (<>) = (*)

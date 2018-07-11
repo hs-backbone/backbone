@@ -9,12 +9,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
---{-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
 module Backbone.Algebra.Abstract.Tensor
-    ( TensorAlgebra(..)
+    ( --VecSpace(..)
+     TensorAlgebra(..)
+    , ContravatiantTensor(..)
+    , dot
     )
 where
 
@@ -42,9 +42,12 @@ import           Data.Coerce
 --
 -- FIXME:
 -- This needs to be replaced by the Tensor product in the Monoidal category Vect
--- class (Field (Scalar f), VectorSpace f, VectorSpace f', Scalar f ~ Scalar f'
---         , Scalar f ~ Scalar (f >< f'), VectorSpace (f >< f')) 
-class (Field (Scalar f)) => TensorAlgebra f f'
+-- newtype VecSpace a = VecSpace a
+
+class (Field (Scalar f), VectorSpace f, VectorSpace f', VectorSpace (f >< f')
+        , Scalar f ~ Scalar f'
+        , Scalar f ~ Scalar (f >< f')
+        ) => TensorAlgebra f f'
         where
     -- | Take the tensor product of two vectors
     (><) :: f -> f' -> (f >< f')

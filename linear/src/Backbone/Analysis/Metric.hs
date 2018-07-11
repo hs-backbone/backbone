@@ -17,6 +17,7 @@ module Backbone.Analysis.Metric
     , PreMetric(..)
     , Dual(..)
     , Metric(..)
+    , metric
     , Norm(..)
     , Abs(..)
     )
@@ -59,14 +60,7 @@ metric = preMetric @n
 class (Metric n a b, Group (Sum a), Multiplication b) => Norm n a b | n a -> b where
     {-# INLINE norm #-}
     norm :: a -> b
-    norm a = metric @n a zero
-
-    {-# INLINE normSquared #-}
-    normSquared :: a -> b
-    normSquared x = n * n
-        where
-            n = norm @n x
-
+    norm a = metric @n a zero -- the default is the zero-norm
 
 data Abs
 
